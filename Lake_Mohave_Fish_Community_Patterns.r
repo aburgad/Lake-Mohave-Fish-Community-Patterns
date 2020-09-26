@@ -1,8 +1,16 @@
 #####################################
 #####################################
-#Lake Mohave Fish Community Dynamics
+# Lake Mohave Fish Community Dynamics
 #####################################
 #####################################
+
+# Install required packages if not already
+package_list <- c("tidyverse","tidyr","vegan",
+                  "dplyr","reshape","clustsig",
+                  "cowplot","ggrepel","RVAideMemoire")
+
+new_packages <- package_list[!(package_list %in% installed.packages()[,"Package"])]
+if(length(new_packages)) install.packages(new_packages)
 
 # Load required packages
 #======================================
@@ -10,7 +18,6 @@ library(tidyverse) # Plots and dplyr
 library(tidyr) # Gather function
 library(vegan) # NMDS
 library(dplyr) # Wrangling data
-library(scales) # Change y-axis scales 
 library(reshape) # Melting data
 library(clustsig) # SIMPROF cluster
 library(cowplot) # Combine plots 
@@ -114,16 +121,19 @@ catch
 # 2 - Long-term abundance and richness trends
 #=============================================
 
-# Check for normality 
+# Check distributions
 lapply(df1[ ,2:19], shapiro.test)
 
-# Long-term abundance trends
+# Long-term abundance trends df
 df4 <- cbind(df3$year, df1)
 colnames(df4)[1] <- "year"
 
+# Correlation matrix of species
+cor_df <- as.data.frame(cor(df4[,3:20]))
+
 # Create function for plots 
 abundance_plot <- function(species, title){
-  title <-
+
   plot <- ggplot(df4, aes(x = year, y = species)) +
     geom_point(colour = "black", size = 2) +
     theme_classic() + 
@@ -134,169 +144,70 @@ abundance_plot <- function(species, title){
           axis.text.x = element_text(colour = "black", size = 12, angle = 30, hjust = 1),
           axis.text.y = element_text(colour = "black", size = 12)) +
     labs(y = title, x = "Year")
+  
   return(plot)
 }
 
-# Y-axis titles - arranged in phylogenetic order
-my_DOCE_y_title <- expression(paste(italic("Dorosoma cepedianum"), " CPUE"))
-my_DOPE_y_title <- expression(paste(italic("Dorosoma petenense"), " CPUE"))
-my_ONCLHE_y_title <- expression(paste(italic("Oncorhynchus clarkii henshawi"), " CPUE"))
-my_ONMY_y_title <- expression(paste(italic("Oncorhynchus mykiss"), " CPUE"))
-my_SAFO_y_title <- expression(paste(italic("Salvelinus fontinalis"), " CPUE"))
-my_GIEL_y_title <- expression(paste(italic("Gila elegans"), " CPUE"))
-my_CYCA_y_title <- expression(paste(italic("Cyprinus carpio"), " CPUE"))
-my_XYTE_y_title <- expression(paste(italic("Xyrauchen texanus"), " CPUE"))
-my_AMME_y_title <- expression(paste(italic("Ameiurus melas"), " CPUE"))
-my_AMNA_y_title <- expression(paste(italic("Ameiurus natalis"), " CPUE"))
-my_ICPU_y_title <- expression(paste(italic("Ictalurus punctatus"), " CPUE"))
-my_LECY_y_title <- expression(paste(italic("Lepomis cyanellus"), " CPUE"))
-my_LEMA_y_title <- expression(paste(italic("Lepomis macrochirus"), " CPUE"))
-my_MIDO_y_title <- expression(paste(italic("Micropterus dolomieu"), " CPUE"))
-my_MISA_y_title <- expression(paste(italic("Micropterus salmoides"), " CPUE"))
-my_PONI_y_title <- expression(paste(italic("Pomoxis nigromaculatus"), " CPUE"))
-my_MOSA_y_title <- expression(paste(italic("Morone saxatilis"), " CPUE"))
-
-# Correlations 
+# Correlations (abundance x time) 
 for (i in 3:length(df4)){
   a <- cor.test(df4$year, df4[,i], method = "spearman")
   print(paste(colnames(df4)[i], " rho", a$estimate, " p-value:", a$p.value))
 }
 
-######################
+###############################
+# Species abundance trend plots
+###############################
+
 # Dorosoma cepedianum
-######################
+print(DOCE_plot <- abundance_plot(df4$DOCE, expression(paste(italic("Dorosoma cepedianum"), " CPUE"))))
 
-DOCE_plot <- abundance_plot(df4$DOCE, my_DOCE_y_title)
-
-DOCE_plot
-
-####################
 # Dorosoma petenense
-####################
+print(DOPE_plot <- abundance_plot(df4$DOPE, expression(paste(italic("Dorosoma petenense"), " CPUE"))))
 
-DOPE_plot <- abundance_plot(df4$DOPE, my_DOPE_y_title)
-
-DOPE_plot
-
-##############################
 # Oncorhynchus clarkii henshaw
-##############################
+print(ONCLHE_plot <- abundance_plot(df4$ONCLHE, expression(paste(italic("Oncorhynchus clarkii henshawi"), " CPUE"))))
 
-ONCLHE_plot <- abundance_plot(df4$ONCLHE, my_ONCLHE_y_title)
-
-ONCLHE_plot
-
-#####################
 # Oncorhynchus mykiss
-#####################
+print(ONMY_plot <- abundance_plot(df4$ONMY, expression(paste(italic("Oncorhynchus mykiss"), " CPUE"))))
 
-ONMY_plot <- abundance_plot(df4$ONMY, my_ONMY_y_title)
-
-ONMY_plot
-
-#######################
 # Salvelinus fontinalis
-#######################
+print(SAFO_plot <- abundance_plot(df4$SAFO, expression(paste(italic("Salvelinus fontinalis"), " CPUE"))))
 
-SAFO_plot <- abundance_plot(df4$SAFO, my_SAFO_y_title)
-
-SAFO_plot
-
-###############
 # Gila elegans
-###############
+print(GIEL_plot <- abundance_plot(df4$GIEL, expression(paste(italic("Gila elegans"), " CPUE"))))
 
-GIEL_plot <- abundance_plot(df4$GIEL, my_GIEL_y_title)
-
-GIEL_plot
-
-#################
 # Cyprinus carpio
-#################
+print(CYCA_plot <- abundance_plot(df4$CYCA, expression(paste(italic("Cyprinus carpio"), " CPUE"))))
 
-CYCA_plot <- abundance_plot(df4$CYCA, my_CYCA_y_title)
-
-CYCA_plot
-
-###################
 # Xyrauchen texanus
-###################
+print(XYTE_plot <- abundance_plot(df4$XYTE, expression(paste(italic("Xyrauchen texanus"), " CPUE"))))
 
-XYTE_plot <- abundance_plot(df4$XYTE, my_XYTE_y_title)
-
-XYTE_plot
-
-################
 # Ameiurus melas
-################
+print(AMME_plot <- abundance_plot(df4$AMME, expression(paste(italic("Ameiurus melas"), " CPUE"))))
 
-AMME_plot <- abundance_plot(df4$AMME, my_AMME_y_title)
-
-AMME_plot
-
-##################
 # Ameiurus natalis
-##################
+print(AMNA_plot <- abundance_plot(df4$AMNA, expression(paste(italic("Ameiurus natalis"), " CPUE"))))
 
-AMNA_plot <- abundance_plot(df4$AMNA, my_AMNA_y_title)
-
-AMNA_plot
-
-#####################
 # Ictalurus punctatus
-#####################
+print(ICPU_plot <- abundance_plot(df4$ICPU, expression(paste(italic("Ictalurus punctatus"), " CPUE"))))
 
-ICPU_plot <- abundance_plot(df4$ICPU, my_ICPU_y_title)
-
-ICPU_plot 
-
-###################
 # Lepomis cyanellus
-###################
+print(LECY_plot <- abundance_plot(df4$LECY, expression(paste(italic("Lepomis cyanellus"), " CPUE"))))
 
-LECY_plot <- abundance_plot(df4$LECY, my_LECY_y_title)
-
-LECY_plot
-
-#####################
 # Lepomis macrochirus
-#####################
+print(LEMA_plot <- abundance_plot(df4$LEMA, expression(paste(italic("Lepomis macrochirus"), " CPUE"))))
 
-LEMA_plot <- abundance_plot(df4$LEMA, my_LEMA_y_title)
-
-LEMA_plot
-
-######################
 # Micropterus dolomieu
-######################
+print(MIDO_plot <- abundance_plot(df4$MIDO, expression(paste(italic("Micropterus dolomieu"), " CPUE"))))
 
-MIDO_plot <- abundance_plot(df4$MIDO, my_MIDO_y_title)
-
-MIDO_plot
-
-#######################
 # Micropterus salmoides
-#######################
+print(MISA_plot <- abundance_plot(df4$MISA, expression(paste(italic("Micropterus salmoides"), " CPUE"))))
 
-MISA_plot <- abundance_plot(df4$MISA, my_MISA_y_title)
-
-MISA_plot
-
-#########################
 # Pomoxis nigromaculatus
-#########################
+print(PONI_plot <- abundance_plot(df4$PONI, expression(paste(italic("Pomoxis nigromaculatus"), " CPUE"))))
 
-PONI_plot <- abundance_plot(df4$PONI, my_PONI_y_title)
-
-PONI_plot
-
-##################
 # Morone saxatilis
-##################
-
-MOSA_plot <- abundance_plot(df4$MOSA, my_MOSA_y_title)
-
-MOSA_plot
+print(MOSA_plot <- abundance_plot(df4$MOSA, expression(paste(italic("Morone saxatilis"), " CPUE"))))
 
 #########################
 # Total CPUE and richness
