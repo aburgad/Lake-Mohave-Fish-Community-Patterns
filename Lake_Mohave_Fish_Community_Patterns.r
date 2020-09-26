@@ -432,9 +432,7 @@ simprof.plot(sim, leafcolors=NA, plot=TRUE, fill=TRUE,
 #############################################################################
 
 # Create list of years for convex hulls 
-year = as.data.frame(c(1980,1981,1983,1985,1988,1984,1987,1986,1989,1990,
-         2009,2006,2007,2008,2010,2020,2018,2019,2014,2015,2017,2011,2013,2012,2016,
-         2000,2002,1999,2005,2003,2004,1998,1994,1996,1995,1997,2001,1993,1991,1992))
+year <- as.data.frame(unlist(sim$significantclusters))
 colnames(year) <- "year"
 
 # Group as factor
