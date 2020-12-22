@@ -4,7 +4,7 @@ library(lubridate) # dates
 #--------------------------------------
 
 # read in csv
-df <- read.csv(file = "all_collections_count.csv")
+df <- read.csv(file = "mohave_roundup_catch_data.csv")
 
 # check structure
 head(df)
