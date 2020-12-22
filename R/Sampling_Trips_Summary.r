@@ -21,7 +21,10 @@ samp_df <- df %>%
          date_end = mdy(date_end),
          month_begin = month(date_begin),
          month_end = month(date_end)) %>%
-  select(year, season, date_begin, date_end, net_units, month_begin, month_end)
+  select(year, season, 
+         date_begin, date_end, 
+         net_units, month_begin, 
+         month_end)
 
 print(paste("Range of years"))
 print(paste(range(samp_df$year)))
