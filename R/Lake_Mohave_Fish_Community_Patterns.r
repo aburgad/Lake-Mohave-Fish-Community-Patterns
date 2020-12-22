@@ -10,7 +10,8 @@ package_list <- c("tidyverse","tidyr","vegan",
                   "cowplot","ggrepel","RVAideMemoire")
 
 new_packages <- package_list[!(package_list %in% installed.packages()[,"Package"])]
-if(length(new_packages)) install.packages(new_packages)
+if(length(new_packages)) 
+  install.packages(new_packages)
 
 # Load required packages
 #======================================
@@ -34,21 +35,52 @@ library(RVAideMemoire) # Shapiro tests
 # 1 - Results section and abundance of taxa
 #===========================================
 
-# Read in CPUE data frame 
-df1 <- read.csv("spring_fall_combined_data_cpue.csv", header = T, row.names = 1)
+df <- read.csv(file = "mohave_roundup_catch_data.csv")
+
+# Remove cutthroat spp.
+df1 <- df %>%
+  select(-Cutthroat.spp.)
+
+# Calculate CPUE for each species 
+for (i in 1:ncol(df1[,6:22])){
+ df1[,6:22][,i] <- df1[,6:22][,i] / df1$net_units
+}
+
+# Sum across years 
+total_cpue <- df1 %>%
+  select(-season,-date_begin,-date_end) %>%
+  group_by(year) %>%
+  summarise_all(sum)
+
+num_samp <- df1 %>%
+  group_by(year) %>%
+  tally()
+
+total_cpue <- merge(num_samp, total_cpue, by = "year")
+
+# Function to calculate average CPUE
+average_cpue <- function(){  
+  if(total_cpue$n[i] > 1)
+for (i in 1:ncol(total_cpue[,4:20])) {
+  total_cpue[,4:20][i] <- round(total_cpue[,4:20][i] / total_cpue$n, 3)
+  }
+  return(total_cpue)
+}
+
+df1 <- average_cpue()
 
 # Check structure and summary
 str(df1)
 summary(df1)
 
 # Transform data from long to short 
-abundance_df <- gather(df1, key = "variable", value = "CPUE", -season)
+abundance_df <- gather(df1, key = "variable", value = "CPUE", -year,-n,-net_units)
 
 # Plot
 ggplot(abundance_df, aes(x = reorder(variable, -CPUE), CPUE)) +
   geom_boxplot()
   
-# Subset 10 species with highest CPUE
+# Subset 10 species with highest CPUE (core species)
 df2 <- df1 %>%
   select(CYCA,XYTE,ONMY,
          MISA,MOSA,ICPU,
@@ -75,32 +107,34 @@ p1 <- ggplot(cpue_melt, aes(x=reorder(variable,-value,FUN = mean),y=value)) + # 
 
 p1
 
-#-------------------------------------------------
 # Stacked plot of non-native and native abundance
 #-------------------------------------------------
 
-# Read in csv 
-df3 <- read.csv("native_non_abundance.csv", header = T)
+comm_abund <- df %>%
+  select(-Cutthroat.spp.,-season,-date_begin,-date_end,-net_units) %>%
+  gather(key = "species", value = "n", -year) %>%
+  mutate(native = ifelse(species == "XYTE" | species == "GIEL", "Native", "Nonnative")) %>%
+  group_by(native,year) %>%
+  summarise(total = sum(n)) %>%
+  spread(native,total)
 
-# Calculate relative abundance
-comm_abund <- sweep(df3[,2:3], 1, rowSums(df3), '/')*100
-
-# Bind datasets 
-comm_abund <- cbind(comm_abund,df3$year)
-colnames(comm_abund)[3] <- "year"
-
-# Melt data
-abun_melt <- melt(comm_abund, id.vars=c("year"))
+# Calculate relative abundance for native and nonnative
+rel_abund <- comm_abund %>%
+  mutate(Total = Native + Nonnative,
+         Native = Native/Total*100,
+         Nonnative = Nonnative/Total*100) %>%
+  gather(key = "variable", value = "value", -year,-Total)
 
 # Stacked line graph of native and nonnative abundance
-p2 <- ggplot(abun_melt, aes(x=year,y=value,group=variable,fill=variable)) + 
+p2 <- ggplot(rel_abund, aes(x=year,y=value,group=variable,fill=variable)) + 
   geom_area(position="fill") +
-  scale_fill_brewer(palette="Greys", breaks=rev(levels(abun_melt$variable))) +
   theme_classic() + 
+  scale_fill_manual(values = c("gray85","gray40")) + 
   theme(axis.line.x = element_line(colour = 'black', size = 0.1, linetype = 'solid'), 
         axis.line.y = element_line(colour = 'black', size = 0.1, linetype = 'solid'),
         axis.title = element_text(size = 15, colour = "black"),
         legend.text = element_text(size = 15, colour = "black"),
+        legend.position = "top",
         legend.title = element_blank(),
         axis.text.x = element_text(colour = "black", size = 15, angle = 30, hjust = 1),
         axis.text.y = element_text(colour = "black", size = 15)) + 
@@ -122,19 +156,15 @@ catch
 #=============================================
 
 # Check distributions
-lapply(df1[ ,2:19], shapiro.test)
-
-# Long-term abundance trends df
-df4 <- cbind(df3$year, df1)
-colnames(df4)[1] <- "year"
+lapply(df1[ ,4:20], shapiro.test)
 
 # Correlation matrix of species
-cor_df <- as.data.frame(cor(df4[,3:20]))
+cor_df <- as.data.frame(cor(df1[,4:20]))
 
 # Create function for plots 
 abundance_plot <- function(species, title){
 
-  plot <- ggplot(df4, aes(x = year, y = species)) +
+  plot <- ggplot(df1, aes(x = year, y = species)) +
     geom_point(colour = "black", size = 2) +
     theme_classic() + 
     theme(axis.line.x = element_line(colour = 'black', size = 0.1, linetype = 'solid'), 
@@ -149,78 +179,109 @@ abundance_plot <- function(species, title){
 }
 
 # Correlations (abundance x time) 
-for (i in 3:length(df4)){
-  a <- cor.test(df4$year, df4[,i], method = "spearman")
-  print(paste(colnames(df4)[i], " rho", a$estimate, " p-value:", a$p.value))
+for (i in 3:length(df1)){
+  a <- cor.test(df1$year, df1[,i], method = "spearman")
+  print(paste(colnames(df1)[i], " rho", a$estimate, " p-value:", a$p.value))
 }
 
-###############################
-# Species abundance trend plots
-###############################
+###########################################
+# Species abundance individual trend plots
+###########################################
 
 # Dorosoma cepedianum
-print(DOCE_plot <- abundance_plot(df4$DOCE, expression(paste(italic("Dorosoma cepedianum"), " CPUE"))))
+print(DOCE_plot <- abundance_plot(df1$DOCE, expression(paste(italic("Dorosoma cepedianum"), " CPUE"))))
 
 # Dorosoma petenense
-print(DOPE_plot <- abundance_plot(df4$DOPE, expression(paste(italic("Dorosoma petenense"), " CPUE"))))
+print(DOPE_plot <- abundance_plot(df1$DOPE, expression(paste(italic("Dorosoma petenense"), " CPUE"))))
 
 # Oncorhynchus clarkii henshaw
-print(ONCLHE_plot <- abundance_plot(df4$ONCLHE, expression(paste(italic("Oncorhynchus clarkii henshawi"), " CPUE"))))
+print(ONCLHE_plot <- abundance_plot(df1$ONCLHE, expression(paste(italic("Oncorhynchus clarkii henshawi"), " CPUE"))))
 
 # Oncorhynchus mykiss
-print(ONMY_plot <- abundance_plot(df4$ONMY, expression(paste(italic("Oncorhynchus mykiss"), " CPUE"))))
+print(ONMY_plot <- abundance_plot(df1$ONMY, expression(paste(italic("Oncorhynchus mykiss"), " CPUE"))))
 
 # Salvelinus fontinalis
-print(SAFO_plot <- abundance_plot(df4$SAFO, expression(paste(italic("Salvelinus fontinalis"), " CPUE"))))
+print(SAFO_plot <- abundance_plot(df1$SAFO, expression(paste(italic("Salvelinus fontinalis"), " CPUE"))))
 
 # Gila elegans
-print(GIEL_plot <- abundance_plot(df4$GIEL, expression(paste(italic("Gila elegans"), " CPUE"))))
+print(GIEL_plot <- abundance_plot(df1$GIEL, expression(paste(italic("Gila elegans"), " CPUE"))))
 
 # Cyprinus carpio
-print(CYCA_plot <- abundance_plot(df4$CYCA, expression(paste(italic("Cyprinus carpio"), " CPUE"))))
+print(CYCA_plot <- abundance_plot(df1$CYCA, expression(paste(italic("Cyprinus carpio"), " CPUE"))))
 
 # Xyrauchen texanus
-print(XYTE_plot <- abundance_plot(df4$XYTE, expression(paste(italic("Xyrauchen texanus"), " CPUE"))))
+print(XYTE_plot <- abundance_plot(df1$XYTE, expression(paste(italic("Xyrauchen texanus"), " CPUE"))))
 
 # Ameiurus melas
-print(AMME_plot <- abundance_plot(df4$AMME, expression(paste(italic("Ameiurus melas"), " CPUE"))))
+print(AMME_plot <- abundance_plot(df1$AMME, expression(paste(italic("Ameiurus melas"), " CPUE"))))
 
 # Ameiurus natalis
-print(AMNA_plot <- abundance_plot(df4$AMNA, expression(paste(italic("Ameiurus natalis"), " CPUE"))))
+print(AMNA_plot <- abundance_plot(df1$AMNA, expression(paste(italic("Ameiurus natalis"), " CPUE"))))
 
 # Ictalurus punctatus
-print(ICPU_plot <- abundance_plot(df4$ICPU, expression(paste(italic("Ictalurus punctatus"), " CPUE"))))
+print(ICPU_plot <- abundance_plot(df1$ICPU, expression(paste(italic("Ictalurus punctatus"), " CPUE"))))
 
 # Lepomis cyanellus
-print(LECY_plot <- abundance_plot(df4$LECY, expression(paste(italic("Lepomis cyanellus"), " CPUE"))))
+print(LECY_plot <- abundance_plot(df1$LECY, expression(paste(italic("Lepomis cyanellus"), " CPUE"))))
 
 # Lepomis macrochirus
-print(LEMA_plot <- abundance_plot(df4$LEMA, expression(paste(italic("Lepomis macrochirus"), " CPUE"))))
+print(LEMA_plot <- abundance_plot(df1$LEMA, expression(paste(italic("Lepomis macrochirus"), " CPUE"))))
 
 # Micropterus dolomieu
-print(MIDO_plot <- abundance_plot(df4$MIDO, expression(paste(italic("Micropterus dolomieu"), " CPUE"))))
+print(MIDO_plot <- abundance_plot(df1$MIDO, expression(paste(italic("Micropterus dolomieu"), " CPUE"))))
 
 # Micropterus salmoides
-print(MISA_plot <- abundance_plot(df4$MISA, expression(paste(italic("Micropterus salmoides"), " CPUE"))))
+print(MISA_plot <- abundance_plot(df1$MISA, expression(paste(italic("Micropterus salmoides"), " CPUE"))))
 
 # Pomoxis nigromaculatus
-print(PONI_plot <- abundance_plot(df4$PONI, expression(paste(italic("Pomoxis nigromaculatus"), " CPUE"))))
+print(PONI_plot <- abundance_plot(df1$PONI, expression(paste(italic("Pomoxis nigromaculatus"), " CPUE"))))
 
 # Morone saxatilis
-print(MOSA_plot <- abundance_plot(df4$MOSA, expression(paste(italic("Morone saxatilis"), " CPUE"))))
+print(MOSA_plot <- abundance_plot(df1$MOSA, expression(paste(italic("Morone saxatilis"), " CPUE"))))
+
+##############
+# Trend plots
+##############
+
+# Transform from wide to long
+df1 %>%
+  gather(key = "species", value = "CPUE", -year, -n, -net_units) %>%
+ggplot(., aes(x = year, y = CPUE)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm") +
+  scale_y_continuous(limits = c(0,10)) +
+  theme(axis.text.x = element_text(angle = 30, colour = "black"),
+        axis.text.y = element_text(colour = "black")) + 
+  facet_wrap(~species) +
+  theme_bw()
 
 #########################
 # Total CPUE and richness
 #########################
 
-# Read in csv
-df5 <- read.csv("cpue_richness.csv", header = T)
+# Sum CPUE
+cpue_df <- df1 %>%
+  select(-n,-net_units) %>%
+  rowwise() %>%
+  mutate(cpue = sum(c_across(DOCE:MOSA))) %>%
+  select(year,cpue)
+
+# Calculate richness
+rich_df <- df1 %>%
+  select(-year,-n,-net_units) %>%
+  mutate_if(is.numeric, ~1 * (. > 0)) %>%
+  rowwise() %>%
+  mutate(richness = sum(c_across(DOCE:MOSA))) %>%
+  select(richness)
+
+# Combine columns
+cpue_rich_df <- cbind(cpue_df,rich_df)
 
 # Check for normal distribution
-lapply(df5[,2:3], shapiro.test)
+lapply(cpue_rich_df[,2:3], shapiro.test)
 
 # CPUE plot
-cpue <- ggplot(df5, aes(x = year, y = cpue)) +
+cpue <- ggplot(cpue_rich_df, aes(x = year, y = cpue)) +
   geom_point(colour = "black", size = 2) +
   theme_classic() + 
   theme(axis.line.x = element_line(colour = 'black', size = 1.0, linetype = 'solid'), 
@@ -237,7 +298,7 @@ cpue <- ggplot(df5, aes(x = year, y = cpue)) +
 cpue
 
 # Richness plot
-richness <- ggplot(df5, aes(x = year, y = richness)) +
+richness <- ggplot(cpue_rich_df, aes(x = year, y = richness)) +
   geom_point(colour = "black", size = 2) +
   theme_classic() + 
   theme(axis.line.x = element_line(colour = 'black', size = 1.0, linetype = 'solid'), 
@@ -257,32 +318,30 @@ richness
 plot_grid(cpue,richness,nrow = 2, labels = c("a","b"))
 
 # Correlations
-cor.test(df5$year, df5$richness, method = "spearman")
+cor.test(cpue_rich_df$year, cpue_rich_df$richness, method = "spearman")
 
-cor.test(df5$year, df5$cpue, method = "spearman")
+cor.test(cpue_rich_df$year, cpue_rich_df$cpue, method = "spearman")
 
 #==========================================================================================================
 # 3 - Fish community trajectory, alternative states, and turnover 
 #================================================================
 
-# Create new dataframe and remove cutthroat spp.
-df6 <- df1 %>%
-  select(-Cutthroat.spp.)
-
-# Remove species that occur in less than 5% of samples 
-df7 <- df6[, colSums(df6[,2:18] != 0) > 1]
+# Remove species that occur in less than 5% of samples for multivariate analysis
+comm_df <- df1[,4:20][, colSums(df1[,4:20] != 0) > 1]
 
 # Fourth-root transformation
-df7_tran <- sqrt(sqrt(df7[,2:17]))
+comm_df_tran <- sqrt(sqrt(comm_df))
+
+row.names(comm_df_tran) <- df1$year
 
 # Establish a seed so results are consistent
 set.seed(101)
 
 # NMDS ordination
-ord <- metaMDS(df7_tran,distance = "bray", k = 2, try = 20, trymax = 1000, autotransform = FALSE, wascores = TRUE, plot = TRUE)
+ord <- metaMDS(comm_df_tran,distance = "bray", k = 2, try = 20, trymax = 1000, autotransform = FALSE, wascores = TRUE, plot = TRUE)
 
 # Start from previous best solution
-ord_best <- metaMDS(df7_tran,distance = "bray", k = 2, try = 20, trymax = 1000, autotransform = FALSE, wascores = TRUE, plot = TRUE, previous.best = ord)
+ord_best <- metaMDS(comm_df_tran,distance = "bray", k = 2, try = 20, trymax = 1000, autotransform = FALSE, wascores = TRUE, plot = TRUE, previous.best = ord)
 
 print(ord_best)
 
@@ -328,11 +387,11 @@ p3
 ################################################
 
 # Simprof cluster
-sim <- simprof(df7_tran, num.expected=2000, num.simulated=999,
+sim <- simprof(comm_df_tran, num.expected=2000, num.simulated=999,
               method.cluster="average", method.distance="braycurtis",
               method.transform="identity", alpha=0.01,
               sample.orientation="row", const=0,
-              silent=TRUE, increment=100,
+              silent=FALSE, increment=100,
               undef.zero=TRUE)
 
 simprof.plot(sim, leafcolors=NA, plot=TRUE, fill=TRUE,
@@ -385,7 +444,7 @@ p4
 ###################################
 
 # Extract species vectors 
-ef <- envfit(ord_best$points, df7_tran, perm = 999)
+ef <- envfit(ord_best$points, comm_df_tran, perm = 999)
 
 ef
 
@@ -437,8 +496,11 @@ nmds_grid
 # Save image
 # ggsave("Figure X.tiff", width = 5, height = 7, units = 'in', res = 500)
 
+#################
 # DCA - turnover
-dca <- decorana(df7_tran, iweigh=0, ira=0, before=NULL, after=NULL)
+#################
+
+dca <- decorana(comm_df_tran, iweigh=0, ira=0, before=NULL, after=NULL)
 summary(dca)
 plot(dca, display = c("sites"))
 
