@@ -34,9 +34,7 @@ library(RVAideMemoire) # Shapiro tests
 # 1 - Results section and abundance of taxa
 #===========================================
 
-df_raw <- read.csv(file = "mohave_roundup_catch_data.csv")
-
-df <- df_raw
+df <- read.csv(file = "mohave_roundup_catch_data.csv")
 
 tot_sp_catch <- df %>%
   select(-year, -season, 
@@ -135,7 +133,7 @@ print(p1)
 # Stacked plot of non-native and native abundance
 #-------------------------------------------------
 
-comm_abund <- df_raw %>%
+comm_abund <- df %>%
   select(-season,-date_begin,-date_end,-net_units) %>%
   gather(key = "species", value = "n", -year) %>%
   mutate(native = ifelse(species == "XYTE" | species == "GIEL", "Native", "Nonnative")) %>%
@@ -202,7 +200,7 @@ ggplot(cor_df2, aes(x = variable, y = species)) +
   scale_x_discrete(position = "top") +
   scale_y_discrete(limits = rev(levels(cor_df2$species))) 
 
-# Correlations (abundance x time) 
+# Spearman's correlation output (abundance x time) 
 for (i in 3:length(df1)){
   a <- cor.test(df1$year, df1[,i], method = "spearman")
   print(paste(colnames(df1)[i], " rho", a$estimate, " p-value:", a$p.value))
@@ -281,19 +279,23 @@ print(abundance_plot(df1$PONI, expression(paste(italic("Pomoxis nigromaculatus")
 print(abundance_plot(df1$MOSA, expression(paste(italic("Morone saxatilis"), " CPUE"))))
 
 
-# Supplemental trend plot
+# Species trend plot
 #-------------------------
 
-df1 %>%
+# Setting independent y-axis scales due to large variations in CPUE 
+
+trend_plot <- df1 %>%
   gather(key = "species", value = "CPUE", -year, -n, -net_units) %>%
-ggplot(., aes(x = year, y = CPUE)) +
+  ggplot(., aes(x = year, y = CPUE)) +
   geom_point(size = 1) +
-  geom_smooth(method = "lm") +
-  scale_y_continuous(limits = c(0,10)) +
-  theme(axis.text.x = element_text(angle = 30, colour = "black"),
-        axis.text.y = element_text(colour = "black")) + 
-  facet_wrap(~species) +
-  theme_bw()
+  facet_wrap(~species,scales="free") +
+  #geom_smooth(colour = 'black',se=FALSE) + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 75, hjust=1,colour = "black"),
+        axis.text.y = element_text(colour = "black")) +
+  labs(x = 'Year', y = 'CPUE')
+
+print(trend_plot)
 
 # Total CPUE and richness
 -------------------------
