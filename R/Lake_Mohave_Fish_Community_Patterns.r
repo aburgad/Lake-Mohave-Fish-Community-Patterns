@@ -113,7 +113,7 @@ core_df <- df1 %>%
 cpue_melt <- melt(core_df)
 
 # Boxplot of abundance
-p1 <- ggplot(cpue_melt, aes(x=reorder(variable,-value,FUN = mean),y=value)) + # Reorder from highest to lowest CPUE
+p1 <- ggplot(cpue_melt, aes(x=reorder(variable,-value,FUN = mean),y=value)) + # Reorder from highest to lowest CPUE (mean)
   geom_boxplot(color = "black", size = 0.5,
                outlier.colour = "black", 
                fill = "gray",
@@ -122,10 +122,14 @@ p1 <- ggplot(cpue_melt, aes(x=reorder(variable,-value,FUN = mean),y=value)) + # 
   theme_classic() + 
   theme(axis.line.x = element_line(colour = 'black', size = 1.0, linetype = 'solid'), 
         axis.line.y = element_line(colour = 'black', size = 1.0, linetype = 'solid'),
-        axis.text.x = element_text(colour = "black", size = 15, angle = 40, hjust = 1),
+        axis.text.x = element_text(colour = "black", size = 15, angle = 50, hjust = 1),
         axis.title.x = element_blank(),
         axis.text.y = element_text(colour = "black", size = 15),
         axis.title.y = element_text(colour = "black", size = 16)) +
+  scale_x_discrete(labels = c("Common Carp","Razoback Sucker","Rainbow Trout",
+                              "Largemouth Bass","Striped Bass","Channel Catfish",
+                              "Smallmouth Bass","Bluegill","Yellow Bullhead",
+                              "Gizzard Shad")) +
   labs(y = "Mean CPUE")
 
 print(p1)
@@ -147,6 +151,11 @@ rel_abund <- comm_abund %>%
          Native = Native/Total*100,
          Nonnative = Nonnative/Total*100) %>%
   gather(key = "variable", value = "value", -year,-Total)
+
+# avg native abundance
+rel_abund %>%
+  group_by(variable) %>%
+  summarise(mean(value))
 
 # Stacked line graph of native and nonnative abundance
 p2 <- ggplot(rel_abund, aes(x=year,y=value,group=variable,fill=variable)) + 
@@ -170,7 +179,7 @@ catch <- plot_grid(p2, p1, ncol = 1, labels = c("a","b"))
 print(catch)
 
 # Save image
-ggsave("Figure 2.tiff", device = 'tiff',width = 4, height = 7, units = 'in', dpi = 500)
+ggsave("Figure 2.tiff", device = 'tiff',width = 5, height = 7, units = 'in', dpi = 500)
 
 #=============================================
 # 2 - Long-term abundance and richness trends
@@ -207,98 +216,40 @@ for (i in 3:length(df1)){
 }
 
 
-# Species abundance individual trend plots
-#------------------------------------------
-
-# Create function for plots 
-abundance_plot <- function(species, title){
-  
-  plot <- ggplot(df1, aes(x = year, y = species)) +
-    geom_point(colour = "black", size = 2) +
-    theme_classic() + 
-    theme(axis.line.x = element_line(colour = 'black', size = 0.1, linetype = 'solid'), 
-          axis.line.y = element_line(colour = 'black', size = 0.1, linetype = 'solid'),
-          axis.title = element_text(size = 12, colour = "black"),
-          legend.title = element_blank(),
-          axis.text.x = element_text(colour = "black", size = 12, angle = 30, hjust = 1),
-          axis.text.y = element_text(colour = "black", size = 12)) +
-    labs(y = title, x = "Year")
-  
-  return(plot)
-}
-
-# Dorosoma cepedianum
-print(abundance_plot(df1$DOCE, expression(paste(italic("Dorosoma cepedianum"), " CPUE"))))
-
-# Dorosoma petenense
-print(abundance_plot(df1$DOPE, expression(paste(italic("Dorosoma petenense"), " CPUE"))))
-
-# Oncorhynchus clarkii henshaw
-print(abundance_plot(df1$ONCLHE, expression(paste(italic("Oncorhynchus clarkii henshawi"), " CPUE"))))
-
-# Oncorhynchus mykiss
-print(abundance_plot(df1$ONMY, expression(paste(italic("Oncorhynchus mykiss"), " CPUE"))))
-
-# Salvelinus fontinalis
-print(abundance_plot(df1$SAFO, expression(paste(italic("Salvelinus fontinalis"), " CPUE"))))
-
-# Gila elegans
-print(abundance_plot(df1$GIEL, expression(paste(italic("Gila elegans"), " CPUE"))))
-
-# Cyprinus carpio
-print(abundance_plot(df1$CYCA, expression(paste(italic("Cyprinus carpio"), " CPUE"))))
-
-# Xyrauchen texanus
-print(abundance_plot(df1$XYTE, expression(paste(italic("Xyrauchen texanus"), " CPUE"))))
-
-# Ameiurus melas
-print(abundance_plot(df1$AMME, expression(paste(italic("Ameiurus melas"), " CPUE"))))
-
-# Ameiurus natalis
-print(abundance_plot(df1$AMNA, expression(paste(italic("Ameiurus natalis"), " CPUE"))))
-
-# Ictalurus punctatus
-print(abundance_plot(df1$ICPU, expression(paste(italic("Ictalurus punctatus"), " CPUE"))))
-
-# Lepomis cyanellus
-print(abundance_plot(df1$LECY, expression(paste(italic("Lepomis cyanellus"), " CPUE"))))
-
-# Lepomis macrochirus
-print(abundance_plot(df1$LEMA, expression(paste(italic("Lepomis macrochirus"), " CPUE"))))
-
-# Micropterus dolomieu
-print(abundance_plot(df1$MIDO, expression(paste(italic("Micropterus dolomieu"), " CPUE"))))
-
-# Micropterus salmoides
-print(abundance_plot(df1$MISA, expression(paste(italic("Micropterus salmoides"), " CPUE"))))
-
-# Pomoxis nigromaculatus
-print(abundance_plot(df1$PONI, expression(paste(italic("Pomoxis nigromaculatus"), " CPUE"))))
-
-# Morone saxatilis
-print(abundance_plot(df1$MOSA, expression(paste(italic("Morone saxatilis"), " CPUE"))))
-
-
 # Species trend plot
 #-------------------------
+
+# Create function to label plots 
+tag_facets <- function(p, open = "(", close = ")", tag_pool = letters, x = -Inf, y = Inf, 
+                       hjust = -0.5, vjust = 1.5, fontface = 2, family = "", alpha_val = 0.6,...) {
+  gb <- ggplot_build(p)
+  lay <- gb$layout$layout
+  tags <- cbind(lay, label = paste0(open, tag_pool[lay$PANEL], close), x = x, y = y)
+  p + geom_text(data = tags, aes_string(x = "x", y = "y", label = "label"), ..., hjust = hjust, 
+                vjust = vjust, fontface = fontface, family = family, inherit.aes = FALSE,
+                alpha = alpha_val)
+}
 
 # Setting independent y-axis scales due to large variations in CPUE 
 
 trend_plot <- df1 %>%
   gather(key = "species", value = "CPUE", -year, -n, -net_units) %>%
   ggplot(., aes(x = year, y = CPUE)) +
-  geom_point(size = 1) +
+  geom_point(size = 0.9,alpha = 0.7) +
   facet_wrap(~species,scales="free") +
-  #geom_smooth(colour = 'black',se=FALSE) + 
   theme_bw() + 
-  theme(axis.text.x = element_text(angle = 75, hjust=1,colour = "black"),
-        axis.text.y = element_text(colour = "black")) +
+  theme(axis.text.x = element_text(angle = 35, hjust=1,colour = "black"),
+        axis.text.y = element_text(colour = "black"),
+        strip.background = element_blank()) +
   labs(x = 'Year', y = 'CPUE')
 
-print(trend_plot)
+tag_facets(trend_plot,open="",close="")
+
+ggsave("Figure 3.tiff", device = 'tiff',width = 6, height = 6, units = 'in', dpi = 500)
+
 
 # Total CPUE and richness
--------------------------
+#-------------------------
 
 # Sum CPUE (appears to be a bug that requires highlighting code to run)
 cpue_df <- df1 %>%
@@ -357,7 +308,7 @@ cpue_rich_p <- plot_grid(cpue,richness,nrow = 2, labels = c("a","b"))
 print(cpue_rich_p)
 
 # Save image
-ggsave("Figure 3.tiff", device = 'tiff',width = 6, height = 7, units = 'in', dpi = 500)
+ggsave("Figure 4.tiff", device = 'tiff',width = 6, height = 7, units = 'in', dpi = 500)
 
 # Mean and SD 
 mean(cpue_rich_df$richness)
@@ -407,6 +358,7 @@ gof <- goodness(ord_best)
 plot(ord_best, display = "sites", type = "n")
 points(ord_best, display = "sites", cex = 2*gof/mean(gof))
 
+
 # NMDS trajectory plot 
 #----------------------
 
@@ -418,25 +370,6 @@ fish_scores$d <- NA
 fish_scores$d[40] <- fish_scores$NMDS1[40]
 fish_scores$e <- NA
 fish_scores$e[40] <- fish_scores$NMDS2[40]
-
-
-p3 <- ggplot(data = fish_scores, aes(x = NMDS1, y = NMDS2)) +
-  geom_point() +
-  theme_classic() +
-  geom_text_repel(label=rownames(fish_scores), size = 6) + # Repel year labels if overlapping
-  geom_segment(aes(xend=c(tail(NMDS1,n=-1),NA), yend=c(tail(NMDS2,n=-1),NA)),) + # Add trajectory arrow
-  geom_segment(aes(xend=c(tail(d,n=-1),NA), yend=c(tail(e,n=-1),NA)),
-               arrow = arrow(length=unit(0.6,"cm"), type = "closed")) +
-  scale_x_continuous(limits = c(-0.8, 0.6)) +
-  theme(axis.text = element_text(size = 18, colour = "black"),
-        axis.title = element_text(size = 18, colour = "black"),
-        legend.text = element_text(size = 18),
-        legend.title = element_blank()) 
-
-print(p3)
-
-# Save image
-ggsave("Figure 4.tiff", width = 8, height = 5, units = 'in', dpi = 500)
 
 
 # SIMPROF cluster analysis - alternative states
@@ -454,6 +387,7 @@ simprof.plot(sim, leafcolors=NA, plot=TRUE, fill=TRUE,
              leaflab="perpendicular", siglinetype=1)
 
 # NMDS plot with convex hulls based on SIMPROF (alternative states)
+# and arrows 
 #-------------------------------------------------------------------
 
 # Create list of years for convex hulls 
@@ -465,7 +399,7 @@ group <- as.data.frame(factor(c(rep("one", 10), rep("two", 15), rep("three",15))
 colnames(group) <- "group"
 
 # Create dataframe
-sim_df <- cbind(fish_scores[,1:2], year, group)
+sim_df <- cbind(fish_scores, year, group)
 
 # Create convex hulls 
 hull1 <- fish_scores[sim_df$group == "one",]
@@ -478,20 +412,23 @@ hull3 = fish_scores[sim_df$group == "three",]
 p4 <- ggplot(data = sim_df, aes(x = NMDS1, y = NMDS2)) +
   geom_point() +
   theme_classic() +
-  geom_text_repel(label=rownames(sim_df), size = 3.5) +
   geom_polygon(inherit.aes=F, data=hull1[chull(hull1),], aes(x=NMDS1, y=NMDS2), 
-               alpha=0.3, fill="gray", linetype=1, color="black") + 
+               alpha=0.3, fill="gray") + 
   geom_polygon(inherit.aes=F, data=hull2[chull(hull2),], aes(x=NMDS1, y=NMDS2), 
-               alpha=0.3, fill="gray", linetype=1, color="black") +
+               alpha=0.3, fill="gray") +
   geom_polygon(inherit.aes=F, data=hull3[chull(hull3),], aes(x=NMDS1, y=NMDS2), 
-               alpha=0.3, fill="gray", linetype=1, color="black") +
+               alpha=0.3, fill="gray") +
+  geom_segment(aes(xend=c(tail(NMDS1,n=-1),NA), yend=c(tail(NMDS2,n=-1),NA))) +
+  geom_segment(aes(xend=c(tail(d,n=-1),NA), yend=c(tail(e,n=-1),NA)),
+               arrow = arrow(length=unit(0.4,"cm"), type = "closed")) +
+  geom_text_repel(label=rownames(sim_df), size = 3.5, colour = 'black',
+                  segment.linetype = 2,point.padding = 0,min.segment.length = 0,
+                  segment.size  = 0.5,nudge_x = .08,nudge_y = 0.002,segment.color="gray3") +
   scale_x_continuous(limits = c(-0.8, 0.6)) +
   theme(axis.line.x = element_line(colour = 'black', size = 1.0, linetype = 'solid'), 
         axis.line.y = element_line(colour = 'black', size = 1.0, linetype = 'solid'),
         axis.text = element_text(size = 15, colour = "black"),
-        axis.title = element_text(size = 15, colour = "black")) +
-  geom_vline(xintercept = 0.0, linetype = 2,colour = "black") +
-  geom_hline(yintercept = 0.0, linetype = 2, colour = "black") 
+        axis.title = element_text(size = 15, colour = "black")) 
 
 print(p4)
 
@@ -533,8 +470,9 @@ p5 <- ggplot(data = sim_df, aes(x = NMDS1, y = NMDS2)) +
   geom_polygon(inherit.aes=F, data=hull3[chull(hull3),], aes(x=NMDS1, y=NMDS2), 
                alpha=0.3, fill=NA, linetype=1, color="black") +
   geom_segment(data = Cred, aes(x = 0, xend = mult*MDS1, y = 0, yend = mult*MDS2), 
-               arrow = arrow(length = unit(0.2, "cm")), size = 0.7,colour = "black") +
-  geom_text_repel(data = Cred, aes(x=mult*MDS1, y=mult*MDS2, label = Species), size = 4, colour = "black") +
+               arrow = arrow(length = unit(0.2, "cm")), size = 0.5,colour = "black") +
+  geom_text_repel(data = Cred, aes(x=mult*MDS1, y=mult*MDS2, label = Species),size = 4, 
+                  colour = "black") +
   scale_x_continuous(limits = c(-0.8, 0.6)) +
   theme(axis.line.x = element_line(colour = 'black', size = 1.0, linetype = 'solid'), 
         axis.line.y = element_line(colour = 'black', size = 1.0, linetype = 'solid'),
@@ -547,7 +485,7 @@ nmds_grid <- plot_grid(p4,p5, ncol = 1, labels = c("a","b"))
 print(nmds_grid)
 
 # Save image
-ggsave("Figure 5.tiff", width = 5, height = 7, units = 'in', dpi = 500)
+ggsave("Figure 5.tiff", width = 6, height = 7, units = 'in', dpi = 500)
 
 
 # DCA - turnover
